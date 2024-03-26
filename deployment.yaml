@@ -1,42 +1,70 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: jenkins
-  namespace: jenkins
+  labels:
+    app: edw-jenkins
+  name: edw-jenkins
+  namespace: edw-jenkins
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: jenkins-server
+      app: edw-jenkins
   template:
     metadata:
       labels:
-        app: jenkins-server
+        app: edw-jenkins
+        wildcardcertmanager: aware
+        internalcert: wildcard
+      annotations:
+        iam.amazonaws.com/role: arn:aws:iam::248273529068:role/test-snf-asg-role
     spec:
       securityContext:
-            fsGroup: 1000 
-            runAsUser: 1000
-      serviceAccountName: jenkins-admin
-      containers:
-        - name: jenkins
+        fsGroup: 1000
+        runAsUser: 1000
+      serviceAccountName: edw-jenkins
+      initContainers:
+        - name: install-helm
           image: jenkins/jenkins:lts
+          command: ["sh", "-c"]
+          securityContext:
+            runAsUser: 0
+          args: [
+              "apt-get update && \
+              apt-get install -y curl && \
+              apt-get clean
+              | curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
+              chmod +x get_helm.sh && \
+              ./get_helm.sh; cp /usr/local/bin/* /dependencies/ ;sleep 100;",
+            ]
+          volumeMounts:
+            - name: helm
+              mountPath: /dependencies
+              # subPath: helm.bin
+      containers:
+        - name: edw-jenkins
+          image: jenkins/jenkins:lts
+          securityContext:
+            runAsUser: 1000
           resources:
             limits:
-              memory: "2.0Gi"
+              memory: "2Gi"
               cpu: "1000m"
             requests:
-              memory: "501Mi"
+              memory: "500Mi"
               cpu: "500m"
           ports:
             - name: httpport
               containerPort: 8080
+              protocol: TCP
             - name: jnlpport
               containerPort: 50000
           livenessProbe:
             httpGet:
               path: "/login"
               port: 8080
-            initialDelaySeconds: 150
+              scheme: HTTP
+            initialDelaySeconds: 90
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 5
@@ -44,14 +72,16 @@ spec:
             httpGet:
               path: "/login"
               port: 8080
-            initialDelaySeconds: 120
+              scheme: HTTP
+            initialDelaySeconds: 60
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           volumeMounts:
-            - name: jenkins-data
-              mountPath: /var/jenkins_home         
+            - name: helm
+              mountPath: /usr/local/bin
+              # subPath: helm.bin
+              readOnly: true
       volumes:
-        - name: jenkins-data
-          persistentVolumeClaim:
-              claimName: jenkins-pv-claim
+        - name: helm
+          emptyDir: {}
