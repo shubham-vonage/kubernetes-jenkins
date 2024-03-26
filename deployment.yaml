@@ -22,7 +22,7 @@ spec:
       securityContext:
         fsGroup: 1000
         runAsUser: 1000
-      serviceAccountName: edw-jenkins
+      # serviceAccountName: edw-jenkins
       initContainers:
         - name: install-helm
           image: jenkins/jenkins:lts
