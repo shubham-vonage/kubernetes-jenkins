@@ -32,6 +32,7 @@ spec:
           args: [
               "apt-get update && \
               apt-get install -y curl && \
+              apt install python3 && \
               apt-get clean
               | curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
               chmod +x get_helm.sh && \
